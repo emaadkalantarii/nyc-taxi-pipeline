@@ -252,3 +252,6 @@ data_quality/uncommitted/
 # dbt (auto-generated)
 dbt_project/target/
 dbt_project/dbt_packages/
+
+logs/
+plugins/

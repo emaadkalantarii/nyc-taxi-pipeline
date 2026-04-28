@@ -1,0 +1,2 @@
+CREATE DATABASE nyc_taxi;
+GRANT ALL PRIVILEGES ON DATABASE nyc_taxi TO airflow;

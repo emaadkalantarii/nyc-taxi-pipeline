@@ -256,3 +256,4 @@ dbt_project/dbt_packages/
 
 logs/
 plugins/
+jars/

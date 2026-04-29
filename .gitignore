@@ -257,3 +257,4 @@ dbt_project/dbt_packages/
 logs/
 plugins/
 jars/
+data_quality/reports/

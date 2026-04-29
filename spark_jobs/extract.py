@@ -1,15 +1,11 @@
 import os
-os.environ["HADOOP_HOME"] = "C:/hadoop"
-os.environ["PATH"] = "C:/hadoop/bin;" + os.environ.get("PATH", "")
-os.environ["HADOOP_OPTS"] = "-Djava.library.path=C:/hadoop/bin"
-
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from pyspark.sql.types import (
     StructType, StructField,
     LongType, DoubleType, IntegerType, TimestampType, StringType
 )
-import os
+from spark_utils import get_spark_session
 
 RAW_DATA_PATH = "data/raw/"
 BRONZE_OUTPUT_PATH = "data/bronze/"
@@ -37,22 +33,11 @@ TAXI_SCHEMA = StructType([
 ])
 
 
-def create_spark_session():
-    return SparkSession.builder \
-        .appName("NYC Taxi Extract") \
-        .master("local[*]") \
-        .config("spark.driver.memory", "2g") \
-        .config("spark.sql.shuffle.partitions", "8") \
-        .config("spark.sql.parquet.enableVectorizedReader", "false") \
-        .getOrCreate()
-
-
 def read_raw_data(spark, path, schema):
-    df = spark.read \
+    return spark.read \
         .option("mergeSchema", "true") \
         .schema(schema) \
         .parquet(path)
-    return df
 
 
 def add_ingestion_metadata(df):
@@ -72,7 +57,7 @@ def write_bronze(df, output_path):
 
 
 def main():
-    spark = create_spark_session()
+    spark = get_spark_session("NYC Taxi Extract")
     spark.sparkContext.setLogLevel("ERROR")
 
     print("Reading raw parquet files...")

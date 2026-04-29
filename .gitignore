@@ -223,6 +223,7 @@ __marimo__/
 data/raw/
 data/silver/
 data/gold/
+data/bronze/
 
 # Python virtual environment
 venv/

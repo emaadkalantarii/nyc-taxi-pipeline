@@ -1,7 +1,7 @@
 # Core data processing
-pyspark==3.5.1
-pandas==2.2.2
-pyarrow==16.0.0
+pyspark==3.5.0
+pandas==2.2.3
+pyarrow==19.0.1
 
 # Database connection
 psycopg2-binary==2.9.9

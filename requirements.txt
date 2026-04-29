@@ -8,7 +8,7 @@ psycopg2-binary==2.9.9
 SQLAlchemy==2.0.30
 
 # Airflow (orchestration)
-apache-airflow==2.9.1
+# apache-airflow==2.9.1 (requires Python <3.13, runs inside Docker container)
 
 # dbt (SQL transformation layer)
 dbt-core==1.8.0

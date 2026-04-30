@@ -259,3 +259,4 @@ plugins/
 jars/
 data_quality/reports/
 dashboard/.streamlit/secrets.toml
+dashboard/init_neon.py

@@ -5,16 +5,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sqlalchemy import create_engine, text
 
-if "neon" in st.secrets:
-    raw_url = st.secrets["neon"]["url"]
-    DB_URL = raw_url.replace("postgresql://", "postgresql+pg8000://").replace("postgres://", "postgresql+pg8000://")
-else:
-    DB_URL = "postgresql+pg8000://airflow:airflow@localhost:5432/nyc_taxi"
-
-
 @st.cache_resource
 def get_engine():
-    return create_engine(DB_URL)
+    if "neon" in st.secrets:
+        raw_url = st.secrets["neon"]["url"]
+        clean_url = raw_url.replace("postgresql://", "postgresql+pg8000://").replace("postgres://", "postgresql+pg8000://")
+        clean_url = clean_url.split("?")[0]
+        return create_engine(
+            clean_url,
+            connect_args={"ssl_context": True}
+        )
+    else:
+        return create_engine("postgresql+pg8000://airflow:airflow@localhost:5432/nyc_taxi")
 
 
 @st.cache_data(ttl=300)

@@ -3,7 +3,7 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 
 LOCAL_DB = "postgresql://airflow:airflow@localhost:5432/nyc_taxi"
-NEON_DB = "postgresql://neondb_owner:npg_AIY3jVwPl9Zs@ep-morning-wind-al5prp8z-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+NEON_DB = "postgresql://neondb_owner:password@ep-morning-wind-al5prp8z-pooler.c-3.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
 
 tables = [
     ("public", "hourly_stats"),

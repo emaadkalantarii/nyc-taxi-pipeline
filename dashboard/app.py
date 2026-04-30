@@ -6,9 +6,10 @@ import plotly.graph_objects as go
 from sqlalchemy import create_engine, text
 
 if "neon" in st.secrets:
-    DB_URL = st.secrets["neon"]["url"]
+    raw_url = st.secrets["neon"]["url"]
+    DB_URL = raw_url.replace("postgresql://", "postgresql+pg8000://").replace("postgres://", "postgresql+pg8000://")
 else:
-    DB_URL = "postgresql://airflow:airflow@localhost:5432/nyc_taxi"
+    DB_URL = "postgresql+pg8000://airflow:airflow@localhost:5432/nyc_taxi"
 
 
 @st.cache_resource

@@ -5,7 +5,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sqlalchemy import create_engine, text
 
-DB_URL = "postgresql://airflow:airflow@localhost:5432/nyc_taxi"
+if "neon" in st.secrets:
+    DB_URL = st.secrets["neon"]["url"]
+else:
+    DB_URL = "postgresql://airflow:airflow@localhost:5432/nyc_taxi"
 
 
 @st.cache_resource

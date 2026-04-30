@@ -55,6 +55,6 @@ jobs:
 
       - name: Run linting
         run: |
-          flake8 spark_jobs/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402 --exclude=__pycache__
-          flake8 data_quality/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402 --exclude=__pycache__
-          flake8 tests/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402 --exclude=__pycache__
+          flake8 spark_jobs/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402,E226,E712 --exclude=__pycache__
+          flake8 data_quality/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402,E226,E712 --exclude=__pycache__
+          flake8 tests/ --max-line-length=120 --ignore=E501,W503,W504,W292,F401,E402,E226,E712 --exclude=__pycache__

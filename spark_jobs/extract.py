@@ -6,6 +6,9 @@ from pyspark.sql.types import (
     LongType, DoubleType, IntegerType, TimestampType, StringType
 )
 from spark_utils import get_spark_session
+from load_env import load_env
+from s3_utils import upload_folder_to_s3, verify_s3_connection
+load_env()
 
 RAW_DATA_PATH = "data/raw/"
 BRONZE_OUTPUT_PATH = "data/bronze/"
@@ -71,6 +74,9 @@ def main():
 
     spark.stop()
     print("Extract complete.")
+
+    if verify_s3_connection():
+        upload_folder_to_s3(BRONZE_OUTPUT_PATH, "bronze")
 
 
 if __name__ == "__main__":

@@ -1,6 +1,9 @@
 import os
 from pyspark.sql import functions as F
 from spark_utils import get_spark_session
+from load_env import load_env
+from s3_utils import upload_folder_to_s3, verify_s3_connection
+load_env()
 
 SILVER_PATH = "data/silver/"
 GOLD_PATH = "data/gold/"
@@ -97,6 +100,9 @@ def main():
 
     spark.stop()
     print("Gold transformation complete.")
+
+    if verify_s3_connection():
+        upload_folder_to_s3(GOLD_PATH, "gold")
 
 
 if __name__ == "__main__":

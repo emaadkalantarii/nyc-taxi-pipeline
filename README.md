@@ -50,7 +50,7 @@ This project simulates a **real-world production data pipeline** as built and ma
 
 ---
 
-## 📊 Key Results
+## 📊 Key Results & Insights
 
 | Metric | Value |
 |---|---|
@@ -67,6 +67,31 @@ This project simulates a **real-world production data pipeline** as built and ma
 | dbt SQL models built | 8 (4 staging views + 4 mart tables) |
 | Dashboard pages | 5 pages, 17 interactive charts |
 | Unit tests | 10 pytest tests — all passing in CI |
+
+All insights derived from 8.4 million real NYC taxi trips, Q1 2024:
+
+**Demand Patterns:**
+- Peak demand: 17:00–20:00 (evening rush + dinner combined)
+- Hour 19 is the single busiest hour with 461,200 trips
+- 56.5% of all hours are classified as Peak demand
+- Afternoon has the most total trips (2.4M) but night rides carry the highest avg fare ($20.39)
+
+**Revenue:**
+- Total Q1 revenue: $234,863,188
+- Jan 4 saw an 18% single-day revenue spike
+- 7-day rolling average smooths daily volatility for trend analysis
+- Active pickup zones fluctuate between ~190–210 per day
+
+**Payment:**
+- Credit card dominates at 63.9% of all trips
+- Credit card users tip at ~20% rate vs near 0% for cash
+- Payment market share is consistent across all three months
+
+**Locations:**
+- 258 unique pickup zones analysed
+- Top zone generates 30x more revenue than bottom zones
+- NTILE quartile analysis segments zones into High/Medium/Low/Minimal value tiers
+
 
 ---
 

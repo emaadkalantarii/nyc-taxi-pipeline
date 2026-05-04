@@ -5,6 +5,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 from sqlalchemy import create_engine, text
 
+if "neon" in st.secrets:
+    raw_url = st.secrets["neon"]["url"]
+    clean_url = raw_url.replace("postgresql://", "postgresql+pg8000://").replace("postgres://", "postgresql+pg8000://")
+    clean_url = clean_url.split("?")[0]
+    DB_URL = clean_url
+else:
+    DB_URL = "postgresql+pg8000://airflow:airflow@localhost:5432/nyc_taxi"
+
+
 @st.cache_resource
 def get_engine():
     if "neon" in st.secrets:
@@ -47,6 +56,7 @@ st.sidebar.markdown("- PySpark (ETL)")
 st.sidebar.markdown("- Apache Airflow (Orchestration)")
 st.sidebar.markdown("- PostgreSQL (Warehouse)")
 st.sidebar.markdown("- dbt (SQL Models)")
+st.sidebar.markdown("- AWS S3 (Data Lake)")
 st.sidebar.markdown("- Docker (Infrastructure)")
 st.sidebar.markdown("- GitHub Actions (CI/CD)")
 
@@ -168,6 +178,32 @@ elif page == "Hourly Patterns":
         }
     )
     st.plotly_chart(fig3, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("Trip Intensity Heatmap — Hour × Day of Week")
+    st.markdown("Each cell shows total trips for that exact hour and day combination. Reveals demand patterns invisible in single-dimension charts — e.g. Friday evenings vs Monday mornings vs Sunday nights.")
+
+    hourly_raw = query("SELECT pickup_hour, pickup_day_of_week, total_trips FROM public.hourly_stats")
+
+    pivot = hourly_raw.pivot_table(
+        index="pickup_day_of_week",
+        columns="pickup_hour",
+        values="total_trips",
+        aggfunc="sum"
+    )
+
+    day_labels = {1: "Sun", 2: "Mon", 3: "Tue", 4: "Wed", 5: "Thu", 6: "Fri", 7: "Sat"}
+    pivot.index = [day_labels.get(d, str(d)) for d in pivot.index]
+
+    fig4 = px.imshow(
+        pivot,
+        labels=dict(x="Hour of Day", y="Day of Week", color="Total Trips"),
+        color_continuous_scale="Blues",
+        aspect="auto",
+        title="Trip Volume Heatmap — Hour of Day vs Day of Week"
+    )
+    fig4.update_layout(height=350)
+    st.plotly_chart(fig4, use_container_width=True)
 
 
 elif page == "Revenue Trends":
@@ -291,11 +327,72 @@ elif page == "Location Analysis":
     fig3.update_layout(height=450)
     st.plotly_chart(fig3, use_container_width=True)
 
+    st.markdown("---")
+    st.subheader("Revenue Concentration — Pareto Analysis")
+    st.markdown("How many zones account for 80% of total revenue? This reveals whether the network revenue is concentrated in a few zones or evenly distributed — critical for operational planning.")
+
+    locations_sorted = locations.sort_values("total_revenue", ascending=False).reset_index(drop=True)
+    locations_sorted["cumulative_revenue"] = locations_sorted["total_revenue"].cumsum()
+    locations_sorted["cumulative_pct"] = (
+        locations_sorted["cumulative_revenue"] / locations_sorted["total_revenue"].sum() * 100
+    ).round(2)
+    locations_sorted["zone_rank"] = locations_sorted.index + 1
+    locations_sorted["zone_pct"] = (
+        locations_sorted["zone_rank"] / len(locations_sorted) * 100
+    ).round(2)
+
+    eighty_pct_idx = locations_sorted[locations_sorted["cumulative_pct"] >= 80].iloc[0]
+    zones_for_80 = int(eighty_pct_idx["zone_rank"])
+    pct_of_zones = round(eighty_pct_idx["zone_pct"], 1)
+
+    fig4 = go.Figure()
+
+    fig4.add_trace(go.Scatter(
+        x=locations_sorted["zone_rank"],
+        y=locations_sorted["cumulative_pct"],
+        mode="lines",
+        name="Cumulative Revenue %",
+        line=dict(color="#1f77b4", width=3),
+        fill="tozeroy",
+        fillcolor="rgba(31, 119, 180, 0.1)"
+    ))
+
+    fig4.add_hline(
+        y=80,
+        line_dash="dash",
+        line_color="#d62728",
+        annotation_text="80% Revenue Threshold",
+        annotation_position="right"
+    )
+
+    fig4.add_vline(
+        x=zones_for_80,
+        line_dash="dash",
+        line_color="#ff7f0e",
+        annotation_text=f"{zones_for_80} zones ({pct_of_zones}%)",
+        annotation_position="top"
+    )
+
+    fig4.update_layout(
+        xaxis_title="Number of Zones (ranked by revenue, highest first)",
+        yaxis_title="Cumulative Revenue (%)",
+        height=420,
+        hovermode="x unified"
+    )
+
+    st.plotly_chart(fig4, use_container_width=True)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Zones Needed for 80% Revenue", f"{zones_for_80} zones")
+    col2.metric("That's Only", f"{pct_of_zones}% of All Zones")
+    col3.metric("Total Zones in Network", f"{len(locations_sorted)}")
+
 
 elif page == "Payment Insights":
     st.title("💳 Payment Method Insights")
 
-    payments = query("SELECT * FROM analytics.mart_payment_insights ORDER BY pickup_month, total_trips DESC")
+    payments = query("SELECT * FROM analytics.mart_payment_insights WHERE pickup_month IN (1, 2, 3) ORDER BY pickup_month, total_trips DESC")
+
 
     col1, col2 = st.columns(2)
 

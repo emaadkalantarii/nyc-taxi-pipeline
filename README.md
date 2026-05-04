@@ -9,24 +9,27 @@
 ![dbt](https://img.shields.io/badge/dbt-1.11-red?logo=dbt)
 ![Docker](https://img.shields.io/badge/Docker-Compose-blue?logo=docker)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue?logo=postgresql)
+![AWS S3](https://img.shields.io/badge/AWS-S3-orange?logo=amazonaws)
 
 ---
 
 ## 📋 Table of Contents
 
 - [Project Overview](#-project-overview)
+- [Key Results](#-key-results)
 - [Architecture](#-architecture)
 - [Tech Stack](#-tech-stack)
 - [Dataset](#-dataset)
-- [Key Results & Insights](#-key-results--insights)
 - [Project Structure](#-project-structure)
 - [Quick Start](#-quick-start)
   - [Option A: Docker (Recommended)](#option-a-docker-recommended)
   - [Option B: Manual Local Setup](#option-b-manual-local-setup)
 - [Pipeline Walkthrough](#-pipeline-walkthrough)
+- [Pipeline Outputs](#-pipeline-outputs)
 - [Data Quality](#-data-quality)
 - [Dashboard](#-dashboard)
 - [CI/CD](#-cicd)
+- [AWS S3 Integration](#-aws-s3-integration)
 - [Skills Demonstrated](#-skills-demonstrated)
 - [Future Improvements](#-future-improvements)
 
@@ -41,8 +44,29 @@ This project simulates a **real-world production data pipeline** as built and ma
 - Production-style Medallion Architecture with three data layers
 - Automated orchestration — the pipeline runs on a daily schedule without manual intervention
 - Data quality gates that catch and report bad data before it reaches the warehouse
+- AWS S3 used as a cloud data lake for Bronze, Silver, and Gold layers
 - SQL transformation layer following modern data stack patterns
 - CI/CD pipeline that runs tests and linting on every code push
+
+---
+
+## 📊 Key Results
+
+| Metric | Value |
+|---|---|
+| Raw trips ingested | 9,554,778 |
+| Clean trips after validation | 8,471,484 (11.25% removed as invalid) |
+| Q1 2024 total revenue | $234,863,188 |
+| Average fare per trip | $19.85 |
+| Busiest hour of day | 19:00 — 461,200 trips |
+| Peak demand classification | 56.5% of all hours qualify as Peak |
+| Zones driving 80% of revenue | 28 out of 258 zones (10.8% of network) |
+| Credit card market share | 63.9% of all trips |
+| Credit card avg tip rate | ~20% vs near 0% for cash |
+| Data quality checks passing | 17 / 18 (99.98% on flagged check) |
+| dbt SQL models built | 8 (4 staging views + 4 mart tables) |
+| Dashboard pages | 5 pages, 17 interactive charts |
+| Unit tests | 10 pytest tests — all passing in CI |
 
 ---
 
@@ -59,7 +83,7 @@ This project simulates a **real-world production data pipeline** as built and ma
 │                      EXTRACT (Bronze Layer)                         │
 │   PySpark reads raw Parquet files │ Schema validation               │
 │   Ingestion metadata added        │ 9,554,778 rows stored           │
-│   Partitioned by VendorID         │ data/bronze/                    │
+│   Partitioned by VendorID         │ AWS S3 → s3://bucket/bronze/    │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
                             ▼
@@ -69,15 +93,15 @@ This project simulates a **real-world production data pipeline** as built and ma
 │   Feature engineering: trip_duration, speed_mph, time_of_day        │
 │   is_weekend, fare_per_mile, tip_percentage, payment labels         │
 │   8,471,484 rows (11.25% removed as invalid)                        │
-│   Partitioned by pickup_month │ data/silver/                        │
+│   Partitioned by pickup_month │ AWS S3 → s3://bucket/silver/        │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      AGGREGATE (Gold Layer)                         │
-│   hourly_stats (509 rows)   │   location_stats (258 rows)           │
-│   payment_stats (18 rows)   │   daily_summary (96 rows)             │
-│   data/gold/                                                        │
+│   hourly_stats (509 rows)   │   location_stats (258 rows)          │
+│   payment_stats (18 rows)   │   daily_summary (96 rows)            │
+│   AWS S3 → s3://bucket/gold/                                        │
 └───────────────────────────┬─────────────────────────────────────────┘
                             │
                             ▼
@@ -89,7 +113,7 @@ This project simulates a **real-world production data pipeline** as built and ma
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    LOAD (PostgreSQL Warehouse)                      │
+│                    LOAD (PostgreSQL Warehouse)                       │
 │   JDBC connection │ 4 Gold tables loaded                            │
 │   Indexed for fast analytical queries                               │
 └───────────────────────────┬─────────────────────────────────────────┘
@@ -125,12 +149,13 @@ start → extract_bronze → transform_silver → transform_gold → validate_da
 |---|---|---|
 | **Processing** | PySpark 3.5.0 | Distributed big data transformation |
 | **Orchestration** | Apache Airflow 2.9.1 | Pipeline scheduling & monitoring |
+| **Cloud Storage** | AWS S3 + boto3 | Cloud data lake for all Medallion layers |
 | **Warehouse** | PostgreSQL 15 | Analytical data storage |
 | **SQL Models** | dbt 1.11 | SQL transformation layer |
 | **Data Quality** | Custom validation framework | Automated data quality checks |
 | **Containerization** | Docker + Docker Compose | Reproducible infrastructure |
 | **CI/CD** | GitHub Actions | Automated testing & linting |
-| **Dashboard** | Streamlit + Plotly | Interactive analytics |
+| **Dashboard** | Streamlit + Plotly | Interactive analytics (17 charts) |
 | **Languages** | Python, SQL | Core development |
 | **File Format** | Apache Parquet | Columnar storage (Bronze/Silver/Gold) |
 | **JDBC** | PostgreSQL JDBC Driver | Spark-to-database connectivity |
@@ -143,46 +168,12 @@ start → extract_bronze → transform_silver → transform_gold → validate_da
 
 | Property | Value |
 |---|---|
-| Period | January – March 2024 |
+| Period | January – March 2024 (Q1) |
 | Raw rows | 9,554,778 |
 | Clean rows | 8,471,484 |
-| File format | Parquet |
+| File format | Apache Parquet |
 | Key columns | pickup/dropoff timestamps, locations, fare, tip, distance, passengers |
-
-**Real data quality issues found and handled:**
-- Negative fare amounts (billing errors)
-- Trip distances > 500 miles (GPS glitches)
-- Timestamps from 2002, 2008, 2009 (system clock resets)
-- Zero passenger trips (system-generated test records)
-- Dropoff before pickup (timestamp corruption)
-
----
-
-## 📊 Key Results & Insights
-
-All insights derived from 8.4 million real NYC taxi trips, Q1 2024:
-
-**Demand Patterns:**
-- Peak demand: 17:00–20:00 (evening rush + dinner combined)
-- Hour 19 is the single busiest hour with 461,200 trips
-- 56.5% of all hours are classified as Peak demand
-- Afternoon has the most total trips (2.4M) but night rides carry the highest avg fare ($20.39)
-
-**Revenue:**
-- Total Q1 revenue: $234,863,188
-- Jan 4 saw an 18% single-day revenue spike
-- 7-day rolling average smooths daily volatility for trend analysis
-- Active pickup zones fluctuate between ~190–210 per day
-
-**Payment:**
-- Credit card dominates at 63.9% of all trips
-- Credit card users tip at ~20% rate vs near 0% for cash
-- Payment market share is consistent across all three months
-
-**Locations:**
-- 258 unique pickup zones analysed
-- Top zone generates 30x more revenue than bottom zones
-- NTILE quartile analysis segments zones into High/Medium/Low/Minimal value tiers
+| License | Public domain — NYC TLC Open Data |
 
 ---
 
@@ -191,12 +182,16 @@ All insights derived from 8.4 million real NYC taxi trips, Q1 2024:
 ```
 nyc-taxi-pipeline/
 │
-├── screenshots/                   # Dashboard screenshots
+├── screenshots/                   # All dashboard and infrastructure screenshots
 │   ├── screenshot_overview.png
 │   ├── screenshot_hourly.png
 │   ├── screenshot_revenue.png
 │   ├── screenshot_location.png
-│   └── screenshot_payment.png
+│   ├── screenshot_payment.png
+│   ├── screenshot_heatmap.png
+│   ├── screenshot_pareto.png
+│   ├── screenshot_cicd.png
+│   └── screenshot_s3.png
 │
 ├── dags/                          # Airflow DAGs
 │   └── taxi_pipeline_dag.py       # Main orchestration DAG (7 tasks, daily schedule)
@@ -204,10 +199,12 @@ nyc-taxi-pipeline/
 ├── spark_jobs/                    # PySpark ETL scripts
 │   ├── spark_utils.py             # Shared SparkSession configuration
 │   ├── config.py                  # Central path and settings config
+│   ├── load_env.py                # .env file loader for environment variables
+│   ├── s3_utils.py                # AWS S3 upload/download helpers (boto3)
 │   ├── explore.py                 # Dataset exploration and profiling
-│   ├── extract.py                 # Bronze layer extraction
-│   ├── transform_silver.py        # Silver layer: cleaning & feature engineering
-│   ├── transform_gold.py          # Gold layer: business aggregations
+│   ├── extract.py                 # Bronze layer extraction + S3 upload
+│   ├── transform_silver.py        # Silver layer: cleaning & feature engineering + S3 upload
+│   ├── transform_gold.py          # Gold layer: business aggregations + S3 upload
 │   ├── load.py                    # PostgreSQL JDBC loader
 │   └── pipeline_tasks.py          # Airflow task wrapper functions
 │
@@ -220,7 +217,7 @@ nyc-taxi-pipeline/
 │   └── models/marts/              # 4 analytical mart tables (mart_*)
 │
 ├── dashboard/                     # Streamlit analytics dashboard
-│   ├── app.py                     # 5-page interactive application
+│   ├── app.py                     # 5-page, 17-chart interactive application
 │   └── requirements.txt           # Dashboard-specific dependencies
 │
 ├── sql/                           # PostgreSQL schema definitions
@@ -235,11 +232,11 @@ nyc-taxi-pipeline/
 ├── .github/workflows/             # CI/CD automation
 │   └── ci.yml                     # GitHub Actions: test + lint on every push
 │
-├── data/                          # Data lake (gitignored)
+├── data/                          # Local data lake fallback (gitignored)
 │   ├── raw/                       # Source Parquet files (download separately)
-│   ├── bronze/                    # Extracted data, partitioned by VendorID
-│   ├── silver/                    # Cleaned + enriched, partitioned by month
-│   └── gold/                      # Aggregated analytical tables
+│   ├── bronze/                    # Local Bronze fallback
+│   ├── silver/                    # Local Silver fallback
+│   └── gold/                      # Local Gold fallback
 │
 ├── docker-compose.yml             # Full infrastructure: PostgreSQL + Airflow + Spark
 ├── init-db.sql                    # PostgreSQL database and schema initialization
@@ -258,6 +255,7 @@ nyc-taxi-pipeline/
 - [Git](https://git-scm.com/) installed
 - [Python 3.11+](https://www.python.org/) (for running Spark scripts locally)
 - [Java 11 JDK](https://adoptium.net/temurin/releases/?version=11) (required by PySpark)
+- AWS account with S3 access (optional — local fallback available without AWS)
 - 8GB RAM minimum recommended
 - 5GB free disk space for data files
 
@@ -288,13 +286,15 @@ This option starts **PostgreSQL, Apache Airflow, and Apache Spark** with a singl
 cp .env.example .env
 ```
 
+Edit `.env` and fill in your AWS credentials if using S3. Set `USE_S3=false` to skip AWS and use local storage instead.
+
 **Step 2 — Start all services**
 
 ```bash
 docker compose up -d
 ```
 
-Wait ~30 seconds for all services to become healthy:
+Wait ~30 seconds then verify:
 
 ```bash
 docker compose ps
@@ -319,7 +319,7 @@ python -m venv venv
 venv\Scripts\activate        # Windows
 # source venv/bin/activate   # Mac/Linux
 
-pip install pyspark==3.5.0 pyarrow pandas psycopg2-binary sqlalchemy pg8000
+pip install pyspark==3.5.0 pyarrow pandas psycopg2-binary sqlalchemy pg8000 boto3
 ```
 
 > **Windows users:** Download `winutils.exe` and `hadoop.dll` from [cdarlint/winutils](https://github.com/cdarlint/winutils/tree/master/hadoop-3.3.5/bin) and place them in `C:\hadoop\bin\`. Set environment variable `HADOOP_HOME=C:\hadoop`.
@@ -353,13 +353,11 @@ Open http://localhost:8501
 
 **Step 8 — Explore the Airflow DAG**
 
-Open http://localhost:8080 → login `admin/admin` → find `nyc_taxi_pipeline` → click the play button ▶ to trigger a manual run and watch all 7 tasks execute in sequence.
+Open http://localhost:8080 → login `admin/admin` → find `nyc_taxi_pipeline` → click ▶ to trigger a manual run.
 
 ---
 
 ### Option B: Manual Local Setup
-
-This option runs everything locally without Docker. Requires PostgreSQL installed on your machine.
 
 **Step 1 — Install PostgreSQL 15** from [postgresql.org](https://www.postgresql.org/download/) and create the databases:
 
@@ -379,7 +377,7 @@ psql -U airflow -d nyc_taxi -f sql/create_tables.sql
 python -m venv venv
 venv\Scripts\activate
 
-pip install pyspark==3.5.0 pyarrow pandas psycopg2-binary sqlalchemy pg8000 dbt-core dbt-postgres streamlit plotly pytest
+pip install pyspark==3.5.0 pyarrow pandas psycopg2-binary sqlalchemy pg8000 boto3 dbt-core dbt-postgres streamlit plotly pytest
 ```
 
 **Step 3 — Configure dbt**
@@ -411,8 +409,7 @@ python data_quality/validate.py
 python spark_jobs/load.py
 
 cd dbt_project/nyc_taxi_dbt
-dbt run
-dbt test
+dbt run && dbt test
 cd ../..
 
 streamlit run dashboard/app.py
@@ -426,11 +423,11 @@ streamlit run dashboard/app.py
 
 **Script:** `spark_jobs/extract.py`
 
-Reads all three Parquet files with PySpark using an explicit schema (faster than inference). Adds audit columns (`ingestion_timestamp`, `source_file`) and writes partitioned Parquet to `data/bronze/`.
+Reads all three Parquet files with PySpark using an explicit schema (faster and safer than schema inference). Adds audit columns (`ingestion_timestamp`, `source_file`) and writes partitioned Parquet to `data/bronze/` locally, then uploads to AWS S3 (`s3://bucket/bronze/`).
 
 ```
 Raw Parquet (3 files) → Schema validation → Audit metadata → Bronze Parquet
-9,554,778 rows | Partitioned by VendorID
+9,554,778 rows | Partitioned by VendorID | Uploaded to AWS S3
 ```
 
 ### Phase 2 — Transform Silver Layer
@@ -442,7 +439,7 @@ Applies domain-driven cleaning rules then engineers 10 new features:
 | Feature | Description |
 |---|---|
 | `trip_duration_minutes` | Dropoff minus pickup converted to minutes |
-| `speed_mph` | Distance ÷ (duration ÷ 60) with zero-guard |
+| `speed_mph` | Distance ÷ (duration ÷ 60) with zero-division guard |
 | `pickup_hour` | Hour extracted from pickup timestamp |
 | `pickup_day_of_week` | Day number (1=Sunday, 7=Saturday) |
 | `pickup_month` | Month number |
@@ -454,14 +451,14 @@ Applies domain-driven cleaning rules then engineers 10 new features:
 
 ```
 Bronze (9,554,778) → Clean + Engineer → Silver (8,471,484)
-1,075,337 invalid rows removed (11.25%) | Partitioned by pickup_month
+1,075,337 invalid rows removed (11.25%) | Partitioned by pickup_month | Uploaded to AWS S3
 ```
 
 ### Phase 3 — Transform Gold Layer
 
 **Script:** `spark_jobs/transform_gold.py`
 
-Creates 4 business-ready aggregation tables:
+Creates 4 business-ready aggregation tables, stored on AWS S3:
 
 | Table | Rows | Description |
 |---|---|---|
@@ -474,19 +471,19 @@ Creates 4 business-ready aggregation tables:
 
 **Script:** `data_quality/validate.py`
 
-Runs 18 automated checks. Generates an HTML report in `data_quality/reports/`.
+Runs 18 automated checks across Silver and Gold layers and generates an HTML report in `data_quality/reports/`.
 
 ### Phase 5 — Load to PostgreSQL
 
 **Script:** `spark_jobs/load.py`
 
-Writes all 4 Gold tables to PostgreSQL via JDBC with indexes on commonly filtered columns.
+Writes all 4 Gold tables to PostgreSQL via JDBC with indexes on commonly filtered columns for fast analytical queries.
 
 ### Phase 6 — dbt SQL Models
 
 **Location:** `dbt_project/nyc_taxi_dbt/models/`
 
-| Model | Type | SQL Concepts |
+| Model | Type | SQL Concepts Used |
 |---|---|---|
 | `stg_hourly_stats` | View | CTE, pass-through staging |
 | `stg_daily_summary` | View | CTE, pass-through staging |
@@ -501,10 +498,26 @@ Writes all 4 Gold tables to PostgreSQL via JDBC with indexes on commonly filtere
 
 **File:** `dags/taxi_pipeline_dag.py`
 
-- Scheduled daily at 06:00 UTC via cron expression `0 6 * * *`
+- Scheduled daily at 06:00 UTC via cron `0 6 * * *`
 - 1 automatic retry per task with 5-minute delay
 - Execution timeouts preventing hung tasks from blocking the queue
 - `catchup=False` prevents historical backfill on first deployment
+
+---
+
+## 📤 Pipeline Outputs
+
+| Output | Location | Description |
+|---|---|---|
+| Bronze Parquet | `data/bronze/` + S3 `bronze/` | Raw data with audit metadata, partitioned by VendorID |
+| Silver Parquet | `data/silver/` + S3 `silver/` | Cleaned + engineered, partitioned by pickup_month |
+| Gold — hourly_stats | `data/gold/hourly_stats/` + S3 | 509 rows: trips/revenue/speed by hour and day |
+| Gold — location_stats | `data/gold/location_stats/` + S3 | 258 rows: revenue and pickups by zone |
+| Gold — payment_stats | `data/gold/payment_stats/` + S3 | 18 rows: payment market share per month |
+| Gold — daily_summary | `data/gold/daily_summary/` + S3 | 96 rows: daily KPIs with active zone count |
+| PostgreSQL — public schema | Tables: hourly_stats, location_stats, payment_stats, daily_summary | Gold layer in relational warehouse |
+| PostgreSQL — analytics schema | Views: stg_* (4) │ Tables: mart_* (4) | dbt SQL transformation layer |
+| Data quality report | `data_quality/reports/data_quality_report.html` | 18 checks with pass/fail and pass rate |
 
 ---
 
@@ -512,25 +525,38 @@ Writes all 4 Gold tables to PostgreSQL via JDBC with indexes on commonly filtere
 
 **Overall: 17/18 checks passing**
 
-**Silver Layer (13 checks):**
+**Real data quality issues found and handled:**
 
-| Check | Result |
-|---|---|
-| fare_amount > 0 | ✅ 100% |
-| trip_distance > 0 | ✅ 100% |
-| trip_distance < 500 miles | ✅ 100% |
-| passenger_count 1–8 | ✅ 100% |
-| total_amount > 0 | ✅ 100% |
-| pickup_datetime not null | ✅ 100% |
-| dropoff_datetime not null | ✅ 100% |
-| trip_duration > 0 | ✅ 100% |
-| trip_duration < 180 min | ✅ 100% |
-| speed_mph < 150 | ✅ 100% |
-| PULocationID not null | ✅ 100% |
-| payment_type is valid | ✅ 100% |
-| tip_percentage 0–200% | ⚠️ 99.98% — 12 edge-case rows flagged |
+| Issue Found in Raw Data | Action Taken | Rows Affected |
+|---|---|---|
+| Negative fare amounts | Filtered: fare_amount > 0 required | Billing errors removed |
+| Trip distances > 500 miles | Filtered: trip_distance < 500 required | GPS glitch records removed |
+| Timestamps from 2002, 2008, 2009 | Filtered via duration > 0 and < 180 min | System clock reset records removed |
+| Zero passenger count trips | Filtered: passenger_count ≥ 1 required | System test records removed |
+| Dropoff before pickup | Filtered: dropoff > pickup required | Timestamp corruption removed |
+| Speed > 150 mph | Filtered: speed_mph < 150 required | Data entry errors removed |
+| Trips > 3 hours duration | Filtered: duration < 180 min required | Outlier records removed |
+| Total removed | — | 1,075,337 rows (11.25% of raw data) |
 
-**Gold Layer (5 checks):**
+**Automated validation results (Silver layer — 50,246 row sample):**
+
+| Check | Result | Pass Rate |
+|---|---|---|
+| fare_amount > 0 | ✅ PASS | 100.00% |
+| trip_distance > 0 | ✅ PASS | 100.00% |
+| trip_distance < 500 miles | ✅ PASS | 100.00% |
+| passenger_count 1–8 | ✅ PASS | 100.00% |
+| total_amount > 0 | ✅ PASS | 100.00% |
+| pickup_datetime not null | ✅ PASS | 100.00% |
+| dropoff_datetime not null | ✅ PASS | 100.00% |
+| trip_duration > 0 | ✅ PASS | 100.00% |
+| trip_duration < 180 min | ✅ PASS | 100.00% |
+| speed_mph < 150 | ✅ PASS | 100.00% |
+| PULocationID not null | ✅ PASS | 100.00% |
+| payment_type is valid | ✅ PASS | 100.00% |
+| tip_percentage 0–200% | ⚠️ FAIL | 99.98% (12 edge-case rows) |
+
+**Gold layer checks (5/5 passing):**
 
 | Check | Result |
 |---|---|
@@ -544,7 +570,7 @@ Writes all 4 Gold tables to PostgreSQL via JDBC with indexes on commonly filtere
 
 ## 📈 Dashboard
 
-The Streamlit dashboard connects directly to PostgreSQL and provides 5 interactive analytical pages.
+The Streamlit dashboard connects directly to PostgreSQL and provides **5 interactive pages with 17 charts**.
 
 ---
 
@@ -552,7 +578,7 @@ The Streamlit dashboard connects directly to PostgreSQL and provides 5 interacti
 
 ![Overview](screenshots/screenshot_overview.png)
 
-The landing page shows four headline KPIs computed from the full dataset: **8,471,477 total trips**, **$234.8M total revenue**, **$19.85 average fare**, and **19:00 as the busiest hour**. The dual-axis line chart plots daily trip volume (blue, left axis) against the 7-day rolling average revenue (orange dashed, right axis) — the rolling average smooths daily noise to reveal the underlying Q1 trend. The Pipeline Architecture cards at the bottom summarise the full data flow from Extract through to Serve.
+The landing page shows four headline KPIs: **8,471,477 total trips**, **$234.8M total revenue**, **$19.85 average fare**, and **19:00 as the busiest hour**. The dual-axis line chart plots daily trip volume (blue, left axis) against the 7-day rolling average revenue (orange dashed, right axis) — the rolling average smooths daily noise to reveal the underlying Q1 trend. The Pipeline Architecture cards summarise the full data flow from Extract through to Serve.
 
 ---
 
@@ -560,7 +586,13 @@ The landing page shows four headline KPIs computed from the full dataset: **8,47
 
 ![Hourly Patterns](screenshots/screenshot_hourly.png)
 
-A grouped bar chart compares weekday (blue) vs weekend (orange) trip volumes across all 24 hours. Weekday mornings peak around 08:00 (commuter rush) and evenings spike at 19:00. Weekend demand builds later and stays elevated into the night. The line chart shows average fare by hour — fares are highest at 04:00–06:00 (early airport runs) then drop as daytime demand rises and trip distances shorten. The demand pie chart classifies all hours into Peak (56.5%), Off-Peak (28.6%), and Moderate (14.9%).
+A grouped bar chart compares weekday vs weekend trip volumes across all 24 hours — the morning commute spike (08:00 weekdays) disappears on weekends, replaced by a slower, later build. The line chart shows average fare peaks at 04:00–06:00 (airport runs) then drops as daytime demand rises. The demand pie chart classifies all hours into Peak (56.5%), Off-Peak (28.6%), and Moderate (14.9%).
+
+**Trip Intensity Heatmap — Hour × Day of Week:**
+
+![Heatmap](screenshots/screenshot_heatmap.png)
+
+The heatmap reveals demand patterns invisible in single-dimension charts by crossing hour of day with day of week simultaneously. Each cell encodes total trips as color intensity (darker = more trips). Friday and Saturday evenings (17:00–22:00) are the highest-intensity cells. This is how operational teams identify exact staffing needs at the hour×day level.
 
 ---
 
@@ -568,7 +600,7 @@ A grouped bar chart compares weekday (blue) vs weekend (orange) trip volumes acr
 
 ![Revenue Trends](screenshots/screenshot_revenue.png)
 
-Daily revenue bars consistently land between $2M–$3M across Q1 with visible weekly rhythm. The 7-day rolling average (red line) smooths volatility and confirms a gentle upward revenue trend through February into March. The day-over-day percentage change chart (bottom left) shows most daily swings within ±20%, with one notable February spike. The active pickup zones chart (bottom right) shows 190–210 zones active daily — a measure of geographic spread of demand.
+Daily revenue bars consistently between $2M–$3M with the 7-day rolling average overlaid. Most daily swings are within ±20%. The active pickup zones chart shows 190–210 zones active daily — stable geographic coverage throughout Q1.
 
 ---
 
@@ -576,7 +608,13 @@ Daily revenue bars consistently land between $2M–$3M across Q1 with visible we
 
 ![Location Analysis](screenshots/screenshot_location.png)
 
-The horizontal bar chart ranks the top 20 pickup zones by total revenue — one zone dominates at over $30M for Q1, roughly 30x the lowest zones. The pie chart confirms the NTILE(4) quartile split is perfectly even at 25% per tier. The scatter plot maps all 258 zones by total pickups (x-axis) vs total revenue (y-axis), with point size encoding average fare — zones in the top-right corner are both high-volume and high-revenue, identifying the most strategically valuable locations in the network.
+Top 20 pickup zones ranked by total revenue — one zone exceeds $30M for Q1. The pie chart confirms the even NTILE(4) quartile split. The scatter plot maps all 258 zones by pickups vs revenue with point size encoding average fare.
+
+**Revenue Concentration — Pareto Analysis:**
+
+![Pareto](screenshots/screenshot_pareto.png)
+
+Only **28 zones (10.8% of the network)** account for **80% of all Q1 revenue**. The blue filled curve, red 80% threshold line, and orange vertical marker make this finding immediately readable. This is a critical operational insight — 89.2% of zones contribute only 20% of revenue, with direct implications for driver allocation and surge pricing.
 
 ---
 
@@ -584,24 +622,72 @@ The horizontal bar chart ranks the top 20 pickup zones by total revenue — one 
 
 ![Payment Insights](screenshots/screenshot_payment.png)
 
-Credit card accounts for 63.9% of all trips, with cash at 14.9%. The tip rate bar chart reveals credit card generates ~20% average tip rate while cash is effectively zero — cash passengers rarely record tips in the meter system. The stacked bar chart confirms payment market share is remarkably stable across months 1–4 with no seasonal shift. The revenue line chart shows credit card generates 3–4x more revenue than cash every month, driven by both higher volume and higher tip attachment.
+Credit card dominates at 63.9% of trips with ~20% tip rate. Cash is near 0% tip rate — cash passengers rarely record tips in the meter system, revealing a measurement bias in the raw data. The stacked bar chart confirms payment market share is stable across all three months. Credit card generates 3–4x more revenue than cash every month.
 
 ---
 
 ## ⚙️ CI/CD
 
-GitHub Actions runs two parallel jobs on every push to `main`:
+GitHub Actions runs two parallel jobs automatically on every push to `main`:
 
-**`test` job (32s):**
+![CI/CD](screenshots/screenshot_cicd.png)
+
+**`test` job (29s):**
 - Python 3.11 clean environment
 - Installs pandas and pytest
 - Runs 10 unit tests covering all core transformation logic
 
-**`lint` job (6s):**
+**`lint` job (8s):**
 - Runs flake8 across `spark_jobs/`, `data_quality/`, `tests/`
 - Enforces consistent code style on every commit
 
-**Tests cover:** fare filtering, distance bounds, passenger validation, time-of-day classification including boundary hours, trip duration calculation and zero-duration guard, payment type mapping including unknown codes, tip percentage math and division-by-zero guard, weekend detection, speed calculation, null counting logic.
+**Tests cover:** fare filtering, distance bounds, passenger validation, time-of-day classification including all boundary hours, trip duration calculation and zero-duration guard, payment type mapping including unknown codes, tip percentage math and division-by-zero guard, weekend detection, speed calculation, null counting logic.
+
+---
+
+## ☁️ AWS S3 Integration
+
+The pipeline uses **AWS S3 as a cloud data lake**, storing all three Medallion layers as partitioned Parquet files. This reflects how real data engineering teams store and share large datasets at scale.
+
+![AWS S3](screenshots/screenshot_s3.png)
+
+**S3 Bucket Structure:**
+
+```
+s3://nyc-taxi-pipeline-emad/
+├── raw/                          # Source Parquet files
+├── bronze/                       # Extracted data, partitioned by VendorID
+│   ├── VendorID=1/
+│   └── VendorID=2/
+├── silver/                       # Cleaned + enriched, partitioned by month
+│   ├── pickup_month=1/
+│   ├── pickup_month=2/
+│   └── pickup_month=3/
+└── gold/                         # Aggregated analytical tables
+    ├── hourly_stats/
+    ├── location_stats/
+    ├── payment_stats/
+    └── daily_summary/
+```
+
+**Configuration — add to `.env`:**
+
+```env
+AWS_ACCESS_KEY_ID=your_access_key_id
+AWS_SECRET_ACCESS_KEY=your_secret_access_key
+AWS_REGION=eu-west-1
+S3_BUCKET=your-bucket-name
+USE_S3=true
+```
+
+Set `USE_S3=false` to run entirely locally without AWS credentials.
+
+**Key AWS concepts used:**
+- **S3 buckets** — object storage for the scalable data lake
+- **IAM credentials** — access key + secret key authentication via boto3
+- **boto3** — official AWS SDK for Python
+- **Hive-style partitioning** — S3 prefix structure mirrors partition columns for efficient filtering
+- **Paginated listing** — correctly handles buckets with thousands of objects
 
 ---
 
@@ -617,33 +703,44 @@ GitHub Actions runs two parallel jobs on every push to `main`:
 - dbt SQL transformation layer (CTEs, materialization strategies, ref() dependency graph)
 - Automated data quality validation and HTML reporting
 
-**Software Engineering:**
+**Cloud & Infrastructure:**
+- AWS S3 as a scalable cloud data lake with boto3
+- IAM-based credential management
 - Docker and Docker Compose containerization
-- CI/CD with GitHub Actions (parallel jobs, test automation)
-- Unit testing with pytest (boundary conditions, edge cases)
-- Code quality with flake8
+- CI/CD with GitHub Actions (parallel jobs, automated testing)
+
+**Software Engineering:**
+- Unit testing with pytest (10 tests — boundary conditions, edge cases)
+- Code quality enforcement with flake8
 - Environment variable management and secrets handling
 - Professional Git workflow with descriptive commit history
 
 **SQL Concepts:**
 - CTEs (Common Table Expressions)
-- Window functions: LAG, LEAD, NTILE, rolling AVG OVER, PARTITION BY
-- CASE WHEN classification logic
+- Window functions: LAG, NTILE, rolling AVG OVER, PARTITION BY
+- CASE WHEN classification and bucketing
 - NULLIF for division-by-zero safety
 - Index design for analytical query optimization
 - Multi-schema database design (public + analytics)
+
+**Analytics & Visualisation:**
+- 17-chart interactive Streamlit dashboard
+- Pareto analysis revealing revenue concentration (28 zones = 80% of revenue)
+- Heatmap for multi-dimensional hour × day demand pattern analysis
+- Rolling averages, day-over-day change, quartile ranking
 
 ---
 
 ## 🔮 Future Improvements
 
-- **AWS Integration** — S3 data lake, Glue catalog, Redshift warehouse, EMR for Spark
+- **AWS Glue** — Automated schema cataloging on top of S3 data lake
+- **Amazon Redshift** — Replace PostgreSQL with a cloud-native analytical warehouse
+- **AWS EMR** — Run PySpark jobs on a managed Spark cluster instead of locally
 - **Streaming pipeline** — Apache Kafka + Spark Structured Streaming for real-time ingestion
-- **ML layer** — Fare prediction model using engineered trip features
+- **ML layer** — Fare prediction model using the 10 engineered trip features
 - **Delta Lake** — Replace Parquet with Delta format for ACID transactions and time travel
 - **dbt schema tests** — Add not_null, unique, and accepted_values test definitions
 - **Monitoring & alerting** — Airflow email alerts on task failure, SLA enforcement
-- **Full cloud deployment** — AWS MWAA (Managed Airflow) + RDS PostgreSQL
 
 ---
 

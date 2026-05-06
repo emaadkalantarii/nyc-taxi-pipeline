@@ -1,6 +1,6 @@
 import os
-from pyspark.sql import functions as F
-from spark_utils import get_spark_session
+import sys
+from pyspark.sql import SparkSession
 
 GOLD_PATH = "data/gold/"
 JDBC_URL = "jdbc:postgresql://localhost:5432/nyc_taxi"
@@ -14,39 +14,27 @@ DB_PROPERTIES = {
 }
 
 
-def get_spark_with_jdbc(app_name):
-    return get_spark_session.__wrapped__(app_name) if hasattr(get_spark_session, '__wrapped__') else (
-        __import__('pyspark').sql.SparkSession.builder
-        .appName(app_name)
-        .master("local[*]")
-        .config("spark.driver.memory", "2g")
-        .config("spark.sql.shuffle.partitions", "8")
-        .config("spark.sql.parquet.enableVectorizedReader", "false")
-        .config("spark.driver.extraClassPath", JDBC_JAR)
-        .config("spark.executor.extraClassPath", JDBC_JAR)
-        .config("spark.driver.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin")
-        .config("spark.executor.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin")
-        .getOrCreate()
-    )
-
-
 def create_spark_with_jdbc(app_name):
-    os.environ["HADOOP_HOME"] = "C:/hadoop"
-    os.environ["PATH"] = "C:/hadoop/bin;" + os.environ.get("PATH", "")
-    os.environ["HADOOP_OPTS"] = "-Djava.library.path=C:/hadoop/bin"
+    if sys.platform == "win32":
+        os.environ["HADOOP_HOME"] = "C:/hadoop"
+        os.environ["PATH"] = "C:/hadoop/bin;" + os.environ.get("PATH", "")
+        os.environ["HADOOP_OPTS"] = "-Djava.library.path=C:/hadoop/bin"
 
-    from pyspark.sql import SparkSession
-    return SparkSession.builder \
+    builder = SparkSession.builder \
         .appName(app_name) \
         .master("local[*]") \
         .config("spark.driver.memory", "2g") \
         .config("spark.sql.shuffle.partitions", "8") \
         .config("spark.sql.parquet.enableVectorizedReader", "false") \
         .config("spark.driver.extraClassPath", JDBC_JAR) \
-        .config("spark.executor.extraClassPath", JDBC_JAR) \
-        .config("spark.driver.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin") \
-        .config("spark.executor.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin") \
-        .getOrCreate()
+        .config("spark.executor.extraClassPath", JDBC_JAR)
+
+    if sys.platform == "win32":
+        builder = builder \
+            .config("spark.driver.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin") \
+            .config("spark.executor.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin")
+
+    return builder.getOrCreate()
 
 
 def load_table(df, table_name, mode="overwrite"):
